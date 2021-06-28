@@ -12,9 +12,9 @@ void MeasureOfflinePart1(std::string dataset, int k, int D, int q, int h)
 	std::cout << "Dataset - " << dataset << ", k" << " = {k}, D = {D} Started";
 	std::filesystem::create_directory(DIRECTORY_NAME);
 	std::filesystem::path path(DIRECTORY_NAME + "\\abc.txt");
-	std::ofstream dataFile(path);
+	std::ofstream dataFile(path,std::ios_base::app);
 
-	dataFile << "1234";
+	dataFile << "\n1234";
 	dataFile.close();
 }
 
