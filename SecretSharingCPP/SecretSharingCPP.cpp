@@ -2,27 +2,48 @@
 #include <fstream>
 #include <string>
 #include <filesystem>
+using namespace std;
 
 #include "Protocols.h"
 
-void MeasureOfflinePart1(std::string dataset, int k, int D, int q, int h)
+void MeasureOfflinePart1(string dataset, int k, int D, int q, int h)
 {
-	static const std::string DIRECTORY_NAME = "Test";
+	cout << "Dataset - " << dataset << ", k=" << k << ", D=" << D << " Started" << endl;
+	string directoryName = "k-" + to_string(k) + ", D-" + to_string(D) + ", Dataset-" + dataset + "/";
+	string fileName = directoryName + "MeasureOfflinePart1.txt";
 
-	std::cout << "Dataset - " << dataset << ", k" << " = {k}, D = {D} Started";
-	std::filesystem::create_directory(DIRECTORY_NAME);
-	std::filesystem::path path(DIRECTORY_NAME + "\\abc.txt");
-	std::ofstream dataFile(path,std::ios_base::app);
 
-	dataFile << "\n1234";
+	filesystem::create_directory(directoryName);
+	filesystem::path path(fileName);
+	ofstream dataFile(path, ios_base::app);
+	dataFile << "Database - " + dataset + ", k=" + to_string(k) + ", D=" + to_string(D) + "\n";
 	dataFile.close();
+
+	vector<vector<int8_t>> userItemMatrix = Protocols::ReadUserItemMatrix("ratings-distict-" + dataset + ".dat");
+
+	int N = userItemMatrix.size(); // users
+	int M = userItemMatrix[0].size(); // items
+
+	cout << "MeasureOfflinePart1";
+
+
+	Protocols::SimulateSingleVendorWorkInComputingSimilarityMatrix(userItemMatrix, D, fileName);
+
+	vector<vector<uint16_t>> someRShare;
+	vector<vector<uint16_t>> someXiRShare;
+	vector<vector<uint16_t>> someSqRShare;
+
+	someRShare = Protocols::CreateRandomMatrixShare(N, M);
+	someXiRShare = Protocols::CreateRandomMatrixShare(N, M);
+	someSqRShare = Protocols::CreateRandomMatrixShare(N, M);
+
+	Protocols::SimulateSingleMediatorWorkInComputingSimilarityMatrix(N, M, someRShare, someXiRShare, someSqRShare, D, fileName);
 }
 
 void main(void)
 {
-	MeasureOfflinePart1("Koko", 1, 2, 3, 4);
-	std::vector<std::vector<int8_t>> Rk;
-	std::vector<std::vector<int8_t>> Rx;
-	Protocols::SimulateSingleVendorWorkInComputingSimilarityMatrix(Rk, 2, "abc");
-
+	int q = 80; // num of similar items
+	int h = 20; // num of most recomended items to take
+	string dataset = "100K";
+	MeasureOfflinePart1(dataset, 1, 3, q, h);
 }
