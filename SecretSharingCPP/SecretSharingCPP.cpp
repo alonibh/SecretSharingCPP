@@ -104,12 +104,12 @@ void main(void)
 	srand((unsigned)time(NULL));
 	int q = 80; // num of similar items
 	int h = 20; // num of most recomended items to take
-	const char* datasets[] = { "10M", "100K", "1M",  "20M" };
+	const char* datasets[] = { "100K", "1M", "10M", "20M" };
+
 	for (string dataset : datasets)
 	{
-		StartMeasurement(dataset, 1, 5, q, h);
-		return;
 		StartMeasurement(dataset, 1, 3, q, h);
+		StartMeasurement(dataset, 1, 5, q, h);
 		StartMeasurement(dataset, 1, 7, q, h);
 		StartMeasurement(dataset, 1, 9, q, h);
 		cout << "Done: " + dataset << endl;
