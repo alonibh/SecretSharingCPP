@@ -8,6 +8,8 @@
 #include <iostream>
 #include <filesystem>
 #include<numeric>
+#include <random>
+#include <ppl.h>
 
 using namespace std;
 using namespace std::chrono;
@@ -24,16 +26,40 @@ struct score_comparer
 		return (struct1.score > struct2.score);
 	}
 };
+struct uint64_comparer
+{
+	bool operator() (uint64_t i, uint64_t j) { return (i < j); }
+};
 
 
-void GetSimilarityVectorForTopSimilarItemsToM(const vector<vector<uint32_t>>& similarityMatrix, int m, int q, bool isPositivesOnly, vector<uint32_t>& sm)
+uint64_t ModForNegative(long x)
+{
+	long prime = 2147483647;
+	return ((x % prime + prime) % prime);
+}
+
+vector<int> CreatePermutation(int size)
+{
+	vector<int> vec(size);
+	for (size_t i = 0; i < size; i++)
+	{
+		vec[i] = i;
+	}
+
+	auto rng = default_random_engine{};
+	shuffle(begin(vec), end(vec), rng);
+
+	return vec;
+}
+
+void GetSimilarityVectorForTopSimilarItemsToM(const vector<vector<uint8_t>>& similarityMatrix, int m, int q, bool isPositivesOnly, vector<uint8_t>& sm)
 {
 	size_t vectorLength = similarityMatrix.size();
 	vector<ScoreAndIndex> similarityScoreAndIndex(vectorLength, { 0,0 });
 
 	for (int i = 0; i < vectorLength; i++)
 	{
-		similarityScoreAndIndex.push_back({ similarityMatrix[m][i], i });
+		similarityScoreAndIndex[i] = { similarityMatrix[m][i], i };
 	}
 
 	sort(similarityScoreAndIndex.begin(), similarityScoreAndIndex.end(), score_comparer());
@@ -84,6 +110,17 @@ uint64_t ReconstructShamirSecret(vector<uint64_t>& coordinates)
 }
 
 uint64_t ScalarProductVectors(vector<uint16_t>& vector1, vector<uint16_t>& vector2)
+{
+	int length = vector1.size();
+	uint64_t sum = 0;
+	for (size_t i = 0; i < length; i++)
+	{
+		sum += vector1[i] * vector2[i];
+	}
+	return sum % PRIME;
+}
+
+uint64_t ScalarProductVectors(vector<int>& vector1, vector<int>& vector2)
 {
 	int length = vector1.size();
 	uint64_t sum = 0;
@@ -308,7 +345,7 @@ void AddShare(vector<vector<uint16_t>>& matrix, vector<vector<uint16_t>>& share)
 
 vector<vector<uint16_t>> CreateRandomShares(int n, int numOfShares)
 {
-	vector<vector<uint16_t>> shares;
+	vector<vector<uint16_t>> shares(numOfShares, vector<uint16_t>(n));
 	int maxRangeForRandom = 65535;
 	int minRangeForRandom = 2;
 	int range = maxRangeForRandom - minRangeForRandom + 1;
@@ -320,26 +357,40 @@ vector<vector<uint16_t>> CreateRandomShares(int n, int numOfShares)
 		{
 			vector[j] = rand() % range + minRangeForRandom;
 		}
-		shares.push_back(vector);
+		shares[i] = vector;
 	}
 	return shares;
 }
 
-vector<vector<uint32_t>> CreateRandomMatrix(int M)
+vector<vector<uint8_t>> CreateRandomMatrix(int M)
 {
-	vector<vector<uint32_t>> similarityMatrix(M, vector<uint32_t>(M));
+	vector<vector<uint8_t>> similarityMatrix(M, vector<uint8_t>(M));
 
 	for (size_t i = 0; i < M; i++)
 	{
 		for (size_t j = i + 1; j < M; j++)
 		{
-			double similarityScore = (float)rand() / RAND_MAX;
+			uint8_t similarityScore = rand() % Q;
 			////Convert to integer value
-			similarityMatrix[i][j] = floor((similarityScore * Q) + 0.5);
-			similarityMatrix[j][i] = floor((similarityScore * Q) + 0.5);
+			similarityMatrix[i][j] = similarityScore;
+			similarityMatrix[j][i] = similarityScore;
 		}
 	}
 	return similarityMatrix;
+}
+
+vector<vector<int8_t>> CreateRandomUserItemMatrix(int N, int M)
+{
+	vector<vector<int8_t>> userItemMatrix(N, vector<int8_t>(M));
+
+	for (size_t i = 0; i < N; i++)
+	{
+		for (size_t j = 0; j < M; j++)
+		{
+			userItemMatrix[i][j] = rand() % 6;
+		}
+	}
+	return userItemMatrix;
 }
 
 vector<vector<int8_t>> Protocols::ReadUserItemMatrix(string path)
@@ -386,39 +437,52 @@ vector<vector<uint16_t>> Protocols::CreateRandomMatrixShare(int n, int m)
 
 void Protocols::SimulateSingleVendorWorkInComputingSimilarityMatrix(vector<vector<int8_t>>& Rk, uint32_t numOfShares, const string& fileName)
 {
-	auto start = high_resolution_clock::now();
-
+	vector<vector<int8_t>> randomMatrix = CreateRandomUserItemMatrix(10000, 1000);
 	int N = Rk.size();
 	int M = Rk[0].size();
+	int fakeN = 10000;
+	int fakeM = 1000;
 
-	vector<vector<int8_t>> sq(N, vector<int8_t>(M));
-	vector<vector<int8_t>> xi(N, vector<int8_t>(M));
+	auto start = high_resolution_clock::now();
 
-	CalcSq(Rk, sq);
-	CalcXi(Rk, xi);
+	vector<vector<int8_t>> sq(fakeN, vector<int8_t>(fakeM));
+	vector<vector<int8_t>> xi(fakeN, vector<int8_t>(fakeM));
+
+	CalcSq(randomMatrix, sq);
+	CalcXi(randomMatrix, xi);
 
 	auto stop = high_resolution_clock::now();
 
 	cout << "--ignore " << to_string(sq[0][0]) << " " << to_string(xi[0][0]) << endl;
+	sq.clear();
+	sq.shrink_to_fit();
+	xi.clear();
+	xi.shrink_to_fit();
 
 	auto ATime = duration_cast<milliseconds>(stop - start);
+	double ratio = ((double)N / fakeN) * ((double)M / fakeM);
+	ATime *= ratio;
 
 	filesystem::path path(fileName);
 	ofstream dataFile(path, ios_base::app);
 	dataFile << "A time is: " + to_string(ATime.count()) + " milliseconds\n";
 
-	auto FDTime = milliseconds::zero();
-	for (int i = 0; i < 1000; i++)
+	uint32_t scalar = rand() % 2147483648;
+	start = high_resolution_clock::now();
+
+	for (int i = 0; i < 10000000; i++)
 	{
-		uint32_t scalar = rand() % 2147483648;
-		start = high_resolution_clock::now();
-		auto tmp = ShamirSecretSharingNoStoring(scalar, numOfShares);
-		stop = high_resolution_clock::now();
-		cout << "--ignore " << to_string(tmp) << endl;
-		FDTime += duration_cast<milliseconds>(stop - start);
+		scalar = ShamirSecretSharingNoStoring(scalar, numOfShares);
 	}
 
-	FDTime = FDTime * 3 * Rk.size() * Rk[0].size() / 1000;
+	stop = high_resolution_clock::now();
+
+	cout << "--ignore " << to_string(scalar) << endl;
+
+	auto FDTime = duration_cast<milliseconds>(stop - start);
+
+	FDTime = FDTime * 3 * Rk.size() * Rk[0].size() / 10000000;
+
 	dataFile << "F(" + to_string(numOfShares) + ")*3*N*M: " + to_string(FDTime.count()) + " milliseconds\n";
 
 	auto totalVendorTime = ATime + FDTime;
@@ -429,11 +493,15 @@ void Protocols::SimulateSingleVendorWorkInComputingSimilarityMatrix(vector<vecto
 
 void Protocols::SimulateSingleMediatorWorkInComputingSimilarityMatrix(int N, int M, vector<vector<uint16_t>>& someRShare, vector<vector<uint16_t>>& someXiRShare, vector<vector<uint16_t>>& someSqRShare, int numOfShares, string fileName)
 {
+	int fakeN = someRShare.size();
+	int fakeM = someRShare[0].size();
+	double ratio = ((double)N / fakeN) * ((double)M / fakeM);
+
 	auto start = high_resolution_clock::now();
 
-	vector<vector<uint16_t>> RShare(N, vector<uint16_t>(M));
-	vector<vector<uint16_t>> SqRShare(N, vector<uint16_t>(M));
-	vector<vector<uint16_t>> XiRShare(N, vector<uint16_t>(M));
+	vector<vector<uint16_t>> RShare(fakeN, vector<uint16_t>(fakeM));
+	vector<vector<uint16_t>> SqRShare(fakeN, vector<uint16_t>(fakeM));
+	vector<vector<uint16_t>> XiRShare(fakeN, vector<uint16_t>(fakeM));
 
 	AddShare(RShare, someRShare);
 	AddShare(SqRShare, someSqRShare);
@@ -444,6 +512,7 @@ void Protocols::SimulateSingleMediatorWorkInComputingSimilarityMatrix(int N, int
 	cout << "--ignore " << to_string(RShare[0][0]) << " " << to_string(SqRShare[0][0]) << to_string(XiRShare[0][0]) << endl;
 
 	auto lines7To9Time = duration_cast<milliseconds>(stop - start);
+	lines7To9Time *= ratio;
 
 	filesystem::path path(fileName);
 	ofstream dataFile(path, ios_base::app);
@@ -463,47 +532,50 @@ void Protocols::SimulateSingleMediatorWorkInComputingSimilarityMatrix(int N, int
 	auto someClShare = CreateRandomShares(N, numOfShares)[0];
 
 	start = high_resolution_clock::now();
-	for (uint16_t i = 0; i < 1000; i++)
-	{
-		tmp = ScalarProductVectors(someCmShare, someClShare);
 
-		if (tmp > 0)
-			tmpCounter++;
+	size_t size = 10000;
+	Concurrency::parallel_for(size_t(0), size, [&](size_t i)
+		{
+			tmp = ScalarProductVectors(someCmShare, someClShare);
 
-		someCmShare[i % N] = i;
-	}
+			if (tmp > 0)
+				tmpCounter++;
+
+			someCmShare[i % N] = i;
+		});
+
 	stop = high_resolution_clock::now();
 
 	cout << "--ignore " << to_string(tmpCounter) << endl;
 
 	auto K2Time = duration_cast<milliseconds>(stop - start);
-	K2Time = (K2Time * M * (M - 1) * 3) / (1000 * 2);
+	K2Time = (K2Time * M * (M - 1) * 3) / (10000 * 2);
 	dataFile << "K2: " + to_string(K2Time.count()) + " milliseconds\n";
 
-	vector<uint64_t> coordinates;
+	vector<uint64_t> coordinates(numOfShares);
 	for (int i = 0; i < numOfShares; i++)
 	{
-		coordinates.push_back(rand() % 2147483648);
+		coordinates[i] = rand() % 2147483648;
 	}
 
 	start = high_resolution_clock::now();
 
-	for (size_t i = 0; i < 1000; i++)
-	{
-		tmp = ReconstructShamirSecret(coordinates);
+	Concurrency::parallel_for(size_t(0), size, [&](size_t i)
+		{
+			tmp = ReconstructShamirSecret(coordinates);
 
-		if (tmp > 0)
-			tmpCounter++;
+			if (tmp > 0)
+				tmpCounter++;
 
-		coordinates[i % numOfShares] = i;
-	}
+			coordinates[i % numOfShares] = i;
+		});
 
 	stop = high_resolution_clock::now();
 
 	cout << "--ignore " << to_string(tmpCounter) << endl;
 
 	auto K3Time = duration_cast<milliseconds>(stop - start);
-	K3Time = (K3Time * M * (M - 1)) / (2 * 1000 * numOfShares);
+	K3Time = (K3Time * M * (M - 1)) / (2 * 10000 * numOfShares);
 	dataFile << "K3: " + to_string(K3Time.count()) + " milliseconds\n";
 
 	dataFile.close();
@@ -555,18 +627,20 @@ void Protocols::SimulateSingleMediatorWorkInComputingOfflinePart2(int numOfShare
 	for (size_t itemIndex = 0; itemIndex < 100U; itemIndex++)
 	{
 		vector<uint64_t> xCoordinates(numOfShares, 0);
-
+		size_t i = 0;
 		for (const auto& xd : Xds[itemIndex])
 		{
-			xCoordinates.push_back(xd);
+			xCoordinates[i] = xd;
+			i++;
 		}
 		auto x = ReconstructShamirSecret(xCoordinates);
 
 		vector<uint64_t> yCoordinates(numOfShares, 0);
-
+		i = 0;
 		for (const auto& yd : Yds[itemIndex])
 		{
-			yCoordinates.push_back(yd);
+			yCoordinates[i] = yd;
+			i++;
 		}
 		auto y = ReconstructShamirSecret(yCoordinates);
 
@@ -594,27 +668,32 @@ void Protocols::SimulateSingleMediatorWorkInComputingOfflinePart2(int numOfShare
 	start = high_resolution_clock::now();
 
 	int x = 0;
-	for (int m = 0; m < M; m++)
+	int fakeM = 1000;
+	double ratio = (double)M / fakeM;
+
+	for (int m = 0; m < fakeM; m++)
 	{
 		size_t vectorLength = similarityMatrix.size();
-		vector<uint32_t> sm(vectorLength, 0);
+		vector<uint8_t> sm(vectorLength, 0);
 		GetSimilarityVectorForTopSimilarItemsToM(similarityMatrix, m, q, true, sm);
-		vector<uint32_t> sTagM(vectorLength, 0);
+		vector<uint8_t> sTagM(vectorLength, 0);
 		GetSimilarityVectorForTopSimilarItemsToM(similarityMatrix, m, q, false, sTagM);
-		vector<uint64_t> cl;
+		vector<uint64_t> cl(M);
 		for (int i = 0; i < M; i++)
 		{
-			cl.push_back(round(Q * sm[i] * randomAverageRatings[i]));
+			cl[i] = round(Q * sm[i] * randomAverageRatings[i]);
 		}
 		x += sm[0] + sTagM[0] + cl[0];
 	}
 
 	stop = high_resolution_clock::now();
 
-	cout << x << endl;
+	cout << "--ignore " + to_string(x) << endl;
 
 	auto ZTime = duration_cast<milliseconds>(stop - start);
 	ZTime = ZTime / numOfShares;
+	ZTime *= ratio;
+
 	dataFile << "Z time is: " + to_string(ZTime.count()) + " milliseconds\n";
 
 	dataFile << "Total time for each mediator computing offline part 2: " + to_string(XTime.count() + YTime.count() + ZTime.count()) + " milliseconds\n";
@@ -625,7 +704,7 @@ void Protocols::SimulateSingleMediatorWorkInComputingOfflinePart2(int numOfShare
 
 void Protocols::SimulateSingleMediatorWorkInOnlinePredictRating(int numberOfItems, int numOfShares, string fileName)
 {
-	vector<vector<uint16_t>> smVectors(100, vector<uint16_t>(numberOfItems));;;
+	vector<vector<uint16_t>> smVectors(100, vector<uint16_t>(numberOfItems));
 	for (int i = 0; i < 100; i++)
 	{
 		vector<uint16_t> smVector(numberOfItems, 0);
@@ -633,7 +712,7 @@ void Protocols::SimulateSingleMediatorWorkInOnlinePredictRating(int numberOfItem
 		{
 			smVector[j] = rand() % 6;
 		}
-		smVectors.push_back(smVector);
+		smVectors[i] = smVector;
 	}
 
 	vector<vector<uint16_t>> sharesArray[100];
@@ -659,6 +738,7 @@ void Protocols::SimulateSingleMediatorWorkInOnlinePredictRating(int numberOfItem
 	{
 		vector<uint64_t> xds(shares.size());
 		auto Xstart = high_resolution_clock::now();
+		size_t i = 0;
 
 		for (const auto& share : shares)
 		{
@@ -668,7 +748,8 @@ void Protocols::SimulateSingleMediatorWorkInOnlinePredictRating(int numberOfItem
 				xd += share[itemCounter] * ratingsVector[itemCounter];
 			}
 			xd = round(xd);
-			xds.push_back(xd);
+			xds[i] = xd;
+			i++;
 		}
 
 		auto Xstop = high_resolution_clock::now();
@@ -701,10 +782,106 @@ void Protocols::SimulateSingleMediatorWorkInOnlinePredictRating(int numberOfItem
 
 void Protocols::SimulateSingleMediatorWorkInOnlinePredictRanking(int M, int q, string fileName)
 {
+	auto start = high_resolution_clock::now();
 
+	auto tmp = CreatePermutation(M);
+
+	auto stop = high_resolution_clock::now();
+
+	cout << "--ignore " << to_string(tmp[0]) << endl;
+
+	auto XTime = duration_cast<milliseconds>(stop - start);
+
+	filesystem::path path(fileName);
+	ofstream dataFile(path, ios_base::app);
+	dataFile << "X time is: " + to_string(XTime.count()) + " milliseconds\n";
+
+	vector<int> topItemsSimilarityVector(M);
+	for (size_t i = 0; i < q; i++)
+	{
+		topItemsSimilarityVector[i] = rand() % 100;
+	}
+
+	vector<int> xiRVector(M);
+	for (size_t i = 0; i < M; i++)
+	{
+		xiRVector[i] = rand() % PRIME;
+	}
+
+	int x = 0;
+	int fakeM = 5000;
+
+	double ratio = (double)M / fakeM;
+
+	start = high_resolution_clock::now();
+
+	for (int i = 0; i < 100; i++)
+	{
+		vector<uint64_t> Xd(fakeM);
+		vector<uint64_t> XdShares(fakeM);
+		vector<uint64_t> oneMinusXiShares(fakeM);
+
+		long addon = Q * q + 1;
+
+		for (size_t itemIndex = 0; itemIndex < fakeM; itemIndex++)
+		{
+			long Xdm = addon;
+			Xdm += ScalarProductVectors(topItemsSimilarityVector, xiRVector);
+			XdShares[itemIndex % M] = Xdm;
+			oneMinusXiShares[itemIndex % M] = (1 - xiRVector[itemIndex % M]);
+		}
+
+		for (size_t shareIndex = 0; shareIndex < fakeM; shareIndex++)
+		{
+			long mult = XdShares[shareIndex % M] * oneMinusXiShares[shareIndex % M];
+			auto mod = ModForNegative(mult);
+			Xd[shareIndex % M] = mod;
+		}
+
+		x += (Xd[0] + XdShares[0] + oneMinusXiShares[0]);
+	}
+
+	stop = high_resolution_clock::now();
+
+	cout << "--ignore " << to_string(x) << endl;
+
+	auto YTime = duration_cast<milliseconds>(stop - start);
+	YTime /= 100;
+	YTime *= ratio;
+
+	dataFile << "Y time is: " + to_string(YTime.count()) + " milliseconds\n";
+
+	dataFile << "Total time for each mediator computing online predict ranking: " + to_string(XTime.count() + YTime.count()) + " milliseconds\n";
 }
 
 void Protocols::SimulateSingleVendorWorkInOnlinePredictRanking(int M, int numberOfShares, int h, string fileName)
 {
+	auto vendorTime = milliseconds::zero();
 
+	for (int i = 0; i < 100; i++)
+	{
+		vector<uint64_t> coordinates(M);
+		for (size_t j = 0; j < M; j++)
+		{
+			coordinates[j] = rand() % PRIME;
+		}
+
+		auto start = high_resolution_clock::now();
+
+		auto tmp = ReconstructShamirSecret(coordinates);
+		sort(coordinates.begin(), coordinates.end(), uint64_comparer());
+		vector<uint64_t> top(coordinates.begin(), coordinates.begin() + h);
+
+		auto stop = high_resolution_clock::now();
+
+		cout << "--ignore " << to_string(tmp) << " " << top[0] << endl;
+
+		vendorTime += duration_cast<milliseconds>(stop - start);
+	}
+
+	vendorTime /= 100;
+
+	filesystem::path path(fileName);
+	ofstream dataFile(path, ios_base::app);
+	dataFile << "Total time for a single vendor computing online predict ranking: " + to_string(vendorTime.count()) + " milliseconds\n";
 }

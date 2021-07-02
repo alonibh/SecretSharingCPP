@@ -2,11 +2,13 @@
 #include <fstream>
 #include <string>
 #include <filesystem>
+#include <execution>
+#include "Protocols.h"
+#include <random>
+
 using namespace std;
 
-#include "Protocols.h"
-
-void MeasureOfflinePart1(string dataset, int k, int D, int q, int h)
+void StartMeasurement(string dataset, int k, int D, int q, int h)
 {
 #pragma region Init
 
@@ -39,13 +41,16 @@ void MeasureOfflinePart1(string dataset, int k, int D, int q, int h)
 
 	Protocols::SimulateSingleVendorWorkInComputingSimilarityMatrix(userItemMatrix, D, fileName);
 
+	userItemMatrix.clear();
+	userItemMatrix.shrink_to_fit();
+
 	vector<vector<uint16_t>> someRShare;
 	vector<vector<uint16_t>> someXiRShare;
 	vector<vector<uint16_t>> someSqRShare;
 
-	someRShare = Protocols::CreateRandomMatrixShare(N, M);
-	someXiRShare = Protocols::CreateRandomMatrixShare(N, M);
-	someSqRShare = Protocols::CreateRandomMatrixShare(N, M);
+	someRShare = Protocols::CreateRandomMatrixShare(10000, 1000);
+	someXiRShare = Protocols::CreateRandomMatrixShare(10000, 1000);
+	someSqRShare = Protocols::CreateRandomMatrixShare(10000, 1000);
 
 	Protocols::SimulateSingleMediatorWorkInComputingSimilarityMatrix(N, M, someRShare, someXiRShare, someSqRShare, D, fileName);
 
@@ -99,6 +104,14 @@ void main(void)
 	srand((unsigned)time(NULL));
 	int q = 80; // num of similar items
 	int h = 20; // num of most recomended items to take
-	string dataset = "1M";
-	MeasureOfflinePart1(dataset, 1, 3, q, h);
+	const char* datasets[] = { "10M", "100K", "1M",  "20M" };
+	for (string dataset : datasets)
+	{
+		StartMeasurement(dataset, 1, 5, q, h);
+		return;
+		StartMeasurement(dataset, 1, 3, q, h);
+		StartMeasurement(dataset, 1, 7, q, h);
+		StartMeasurement(dataset, 1, 9, q, h);
+		cout << "Done: " + dataset << endl;
+	}
 }
