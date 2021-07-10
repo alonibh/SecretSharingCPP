@@ -11,6 +11,7 @@
 #include <random>
 #include <ppl.h>
 
+using namespace Concurrency;
 using namespace std;
 using namespace std::chrono;
 
@@ -438,6 +439,7 @@ vector<vector<uint16_t>> Protocols::CreateRandomMatrixShare(int n, int m)
 void Protocols::SimulateSingleVendorWorkInComputingSimilarityMatrix(vector<vector<int8_t>>& Rk, uint32_t numOfShares, const string& fileName)
 {
 	vector<vector<int8_t>> randomMatrix = CreateRandomUserItemMatrix(10000, 1000);
+
 	int N = Rk.size();
 	int M = Rk[0].size();
 	int fakeN = 10000;
@@ -526,30 +528,40 @@ void Protocols::SimulateSingleMediatorWorkInComputingSimilarityMatrix(int N, int
 	XiRShare.shrink_to_fit();
 
 	uint64_t tmp;
-	int tmpCounter = 0;
 
 	auto someCmShare = CreateRandomShares(N, numOfShares)[0];
 	auto someClShare = CreateRandomShares(N, numOfShares)[0];
 
 	start = high_resolution_clock::now();
 
-	size_t size = 10000;
-	Concurrency::parallel_for(size_t(0), size, [&](size_t i)
+	size_t size = 1000;
+
+	parallel_for(size_t(0), size, [&](size_t i)
 		{
 			tmp = ScalarProductVectors(someCmShare, someClShare);
-
-			if (tmp > 0)
-				tmpCounter++;
-
-			someCmShare[i % N] = i;
 		});
 
 	stop = high_resolution_clock::now();
 
-	cout << "--ignore " << to_string(tmpCounter) << endl;
+	cout << "--ignore " << to_string(tmp) << endl;
 
 	auto K2Time = duration_cast<milliseconds>(stop - start);
-	K2Time = (K2Time * M * (M - 1) * 3) / (10000 * 2);
+	K2Time = (K2Time * M * (M - 1) * 3) / (size * 2);
+	dataFile << "K2 (parallel): " + to_string(K2Time.count()) + " milliseconds\n";
+
+	start = high_resolution_clock::now();
+
+	for (size_t i = 0; i < size; i++)
+	{
+		tmp = ScalarProductVectors(someCmShare, someClShare);
+	}
+
+	stop = high_resolution_clock::now();
+
+	cout << "--ignore " << to_string(tmp) << endl;
+
+	K2Time = duration_cast<milliseconds>(stop - start);
+	K2Time = (K2Time * M * (M - 1) * 3) / (size * 2);
 	dataFile << "K2: " + to_string(K2Time.count()) + " milliseconds\n";
 
 	vector<uint64_t> coordinates(numOfShares);
@@ -560,22 +572,17 @@ void Protocols::SimulateSingleMediatorWorkInComputingSimilarityMatrix(int N, int
 
 	start = high_resolution_clock::now();
 
-	Concurrency::parallel_for(size_t(0), size, [&](size_t i)
-		{
-			tmp = ReconstructShamirSecret(coordinates);
-
-			if (tmp > 0)
-				tmpCounter++;
-
-			coordinates[i % numOfShares] = i;
-		});
+	for (size_t i = 0; i < size; i++)
+	{
+		tmp = ReconstructShamirSecret(coordinates);
+	}
 
 	stop = high_resolution_clock::now();
 
-	cout << "--ignore " << to_string(tmpCounter) << endl;
+	cout << "--ignore " << to_string(tmp) << endl;
 
 	auto K3Time = duration_cast<milliseconds>(stop - start);
-	K3Time = (K3Time * M * (M - 1)) / (2 * 10000 * numOfShares);
+	K3Time = (K3Time * 3 * M * (M - 1)) / (2 * size * numOfShares);
 	dataFile << "K3: " + to_string(K3Time.count()) + " milliseconds\n";
 
 	dataFile.close();

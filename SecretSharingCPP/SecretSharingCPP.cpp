@@ -27,7 +27,7 @@ void StartMeasurement(string dataset, int k, int D, int q, int h)
 
 #pragma region Settings
 
-	vector<vector<int8_t>> userItemMatrix = Protocols::ReadUserItemMatrix("ratings-distict-" + dataset + ".dat");
+	vector<vector<int8_t>> userItemMatrix = Protocols::ReadUserItemMatrix(dataset + ".dat");
 
 	int N = userItemMatrix.size(); // users
 	int M = userItemMatrix[0].size(); // items
@@ -103,8 +103,8 @@ void main(void)
 {
 	srand((unsigned)time(NULL));
 	int q = 80; // num of similar items
-	int h = 20; // num of most recomended items to take
-	const char* datasets[] = { "100K", "1M", "10M", "20M" };
+	int h = 10; // num of most recomended items to take
+	const char* datasets[] = { "100K", "1M", "10M", "20M", "WM0","WM1", "WM2", "WM3", "WM4", "WN0", "WN1", "WN2", "WN3", "WN4" };
 
 	for (string dataset : datasets)
 	{
@@ -113,5 +113,6 @@ void main(void)
 		StartMeasurement(dataset, 1, 7, q, h);
 		StartMeasurement(dataset, 1, 9, q, h);
 		cout << "Done: " + dataset << endl;
+		return;
 	}
 }
