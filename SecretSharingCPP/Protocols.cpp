@@ -396,6 +396,8 @@ vector<vector<int8_t>> CreateRandomUserItemMatrix(int N, int M)
 
 vector<vector<int8_t>> Protocols::ReadUserItemMatrix(string path)
 {
+	cout << "Start ReadUserItemMatrix" << endl;
+
 	vector<UserRating> ratings;
 	ifstream infile(path);
 
@@ -417,6 +419,8 @@ vector<vector<int8_t>> Protocols::ReadUserItemMatrix(string path)
 	for (UserRating rating : ratings) {
 		userItemMatrix[rating.UserId - 1][rating.ItemId - 1] = rating.Rating;
 	}
+
+	cout << "Done ReadUserItemMatrix" << endl;
 
 	return userItemMatrix;
 }

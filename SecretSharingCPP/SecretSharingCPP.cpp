@@ -113,6 +113,5 @@ void main(void)
 		StartMeasurement(dataset, 1, 7, q, h);
 		StartMeasurement(dataset, 1, 9, q, h);
 		cout << "Done: " + dataset << endl;
-		return;
 	}
 }
